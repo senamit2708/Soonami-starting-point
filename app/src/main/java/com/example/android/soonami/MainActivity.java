@@ -18,6 +18,7 @@ package com.example.android.soonami;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.text.TextUtils;
 import android.util.Log;
 import android.widget.TextView;
 
@@ -107,7 +108,12 @@ public class MainActivity extends AppCompatActivity {
         @Override
         protected Event doInBackground(URL... urls) {
             // Create URL object
-            URL url = createUrl(USGS_REQUEST_URL);
+            URL url = null;
+            try {
+                url = createUrl(USGS_REQUEST_URL);
+            } catch (MalformedURLException e) {
+                e.printStackTrace();
+            }
 
             // Perform HTTP request to the URL and receive a JSON response back
             String jsonResponse = "";
@@ -140,11 +146,13 @@ public class MainActivity extends AppCompatActivity {
         /**
          * Returns new URL object from the given string URL.
          */
-        private URL createUrl(String stringUrl) {
+        // I dont understand why to use throws here
+        private URL createUrl(String stringUrl) throws MalformedURLException {
             URL url = null;
             try {
                 url = new URL(stringUrl);
             } catch (MalformedURLException exception) {
+                //here we r using log.e as a catch block statement
                 Log.e(LOG_TAG, "Error with creating URL", exception);
                 return null;
             }
@@ -155,7 +163,16 @@ public class MainActivity extends AppCompatActivity {
          * Make an HTTP request to the given URL and return a String as the response.
          */
         private String makeHttpRequest(URL url) throws IOException {
+
             String jsonResponse = "";
+
+            //here we r checking if url is null...then we dont need to open the connection because its useles..nothing will be open
+           //we return here jsonResponse as null ...
+            if (url== null){
+                return jsonResponse;
+            }
+
+
             HttpURLConnection urlConnection = null;
             InputStream inputStream = null;
             try {
@@ -164,10 +181,23 @@ public class MainActivity extends AppCompatActivity {
                 urlConnection.setReadTimeout(10000 /* milliseconds */);
                 urlConnection.setConnectTimeout(15000 /* milliseconds */);
                 urlConnection.connect();
-                inputStream = urlConnection.getInputStream();
-                jsonResponse = readFromStream(inputStream);
+                //now after the connection is established finally ..we r going to check what code we get from that server either
+                // it is 200  -- which is a good connection means connection is stablished perfectly or if any other..then no
+                //need to proceed further
+                if (urlConnection.getResponseCode()==200){
+
+                    inputStream = urlConnection.getInputStream();
+                    jsonResponse = readFromStream(inputStream);
+                    Log.e(LOG_TAG, "Response code is " + urlConnection.getResponseCode());
+                }else {
+                    //here we r trying to get the error code number
+                    Log.e(LOG_TAG, "Error response code " + urlConnection.getResponseCode());
+                }
+
+
             } catch (IOException e) {
                 // TODO: Handle the exception
+                Log.e(LOG_TAG, "Problem parsing the EarthquakeJSON ", e);
             } finally {
                 if (urlConnection != null) {
                     urlConnection.disconnect();
@@ -185,10 +215,16 @@ public class MainActivity extends AppCompatActivity {
          * whole JSON response from the server.
          */
         private String readFromStream(InputStream inputStream) throws IOException {
+
+
+
+            //StringBuilder is mutable ....where as String is not mutable
             StringBuilder output = new StringBuilder();
             if (inputStream != null) {
                 InputStreamReader inputStreamReader = new InputStreamReader(inputStream, Charset.forName("UTF-8"));
                 BufferedReader reader = new BufferedReader(inputStreamReader);
+
+                //????????  i think first we take one line..and after that all lines r taken from the string
                 String line = reader.readLine();
                 while (line != null) {
                     output.append(line);
@@ -203,6 +239,16 @@ public class MainActivity extends AppCompatActivity {
          * about the first earthquake from the input earthquakeJSON string.
          */
         private Event extractFeatureFromJson(String earthquakeJSON) {
+
+
+            // private String makeHttpRequest(URL url) throws IOException ..we r using return jsonResponse of this method here
+            //as a earthquakeJSON
+            //here we first check that ...earthquakeJSON is not empty..if its empty no need to proceed further..
+
+            if (TextUtils.isEmpty(earthquakeJSON)){
+                return null;
+            }
+
             try {
                 JSONObject baseJsonResponse = new JSONObject(earthquakeJSON);
                 JSONArray featureArray = baseJsonResponse.getJSONArray("features");
